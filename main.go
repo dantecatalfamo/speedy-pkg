@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
-	// "strconv"
+	"strconv"
 )
 
 type Package struct {
@@ -134,30 +134,51 @@ func installedPackages() []*Package {
 
 // https://man.openbsd.org/man7/packages-specs.7
 
-func newerPackage(installed, remote *Package) Bool {
-	installedVersion := strings.Split(installed.Version, ".")
-	remoteVersion := strings.Split(remote.Version, ".")
-	iV := installedVersion[len(installedVersion)-1]
-	for idx := range installedVersion {
-		rVer := remoteVersion[idx]
+// func newerPackage(installed, remote *Package) Bool {
+// 	installedVersion := strings.Split(installed.Version, ".")
+// 	remoteVersion := strings.Split(remote.Version, ".")
+// 	iV := installedVersion[len(installedVersion)-1]
+// 	for idx := range installedVersion {
+// 		rVer := remoteVersion[idx]
 
-	}
-}
+// 	}
+// }
 
 type PackageVersion struct {
-	String string,
-	Version []string,
-	Suffix string,
-	SuffixVersion int,
-	Scheme int,
+	String string
+	Version []string
+	Revision int
+	Suffix string
+	SuffixVersion int
+	Scheme int
 }
+
+var packageSuffix = regexp.MustCompile(`(rc|alpha|beta|pre|pl)(\d*)`)
+var packageRevision = regexp.MustCompile(`p(\d+)`)
+var packageScheme = regexp.MustCompile(`[vV](\d+)`)
 
 func packageVersion (ver string) *PackageVersion {
 	fields := strings.Split(ver, ".")
 	lastIdx := len(fields)-1
 	last := fields[lastIdx]
-	pkgVer := &PackageVersion{}
-	for _, num := range fields[:lastIdx] {
-		pkgVer.Version = append(pkgVer.Version, i)
+	pkgVer := &PackageVersion{
+		Scheme: -1,
+		Revision: -1,
+	}
+	pkgVer.Version = fields[:lastIdx]
+	if suffix := packageSuffix.FindStringSubmatch(last); len(suffix) != 0 {
+		pkgVer.Suffix = suffix[1]
+		n, err := strconv.Atoi(suffix[2]);
+		if err != nil {
+			panic(fmt.Sprintf("Failed to convert package suffix version:", err))
+		}
+		pkgVer.SuffixVersion = n
+	}
+	if rev := packageRevision.FindStringSubmatch(last); len(rev) != 0 {
+		n, err := strconv.Atoi(rev[1])
+		if err != nil {
+			panic(fmt.Sprintf("Failed to convert package revision: %s", err))
+		}
+		pkgVer.Revision = n
 	}
 }
