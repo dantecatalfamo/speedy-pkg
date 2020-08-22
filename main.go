@@ -29,6 +29,8 @@ func main() {
 	fmt.Println(len(rpkgs), "remote packages")
 	ipkgs := installedPackages()
 	fmt.Println(len(ipkgs), "installed packages")
+	upgrd := upgradablePackages(ipkgs, rpkgs)
+	fmt.Println(len(upgrd), "upgradable packages")
 }
 
 func getMirror() string {
