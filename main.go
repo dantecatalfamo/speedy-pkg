@@ -132,17 +132,83 @@ func installedPackages() []*Package {
 	return pkgs
 }
 
-// https://man.openbsd.org/man7/packages-specs.7
+var suffixes = []string{ "alpha", "beta", "rc", "pre", "", "pl" }
 
-// func newerPackage(installed, remote *Package) Bool {
-// 	installedVersion := strings.Split(installed.Version, ".")
-// 	remoteVersion := strings.Split(remote.Version, ".")
-// 	iV := installedVersion[len(installedVersion)-1]
-// 	for idx := range installedVersion {
-// 		rVer := remoteVersion[idx]
+func newerPackage(installed, remote *Package) bool {
+	// https://man.openbsd.org/man7/packages-specs.7
 
-// 	}
-// }
+	// New Scheme number
+	if remote.Version.Scheme > installed.Version.Scheme {
+		return true
+	}
+
+	// New Version number
+	iSplit := installed.Version.Version
+	rSplit := remote.Version.Version
+
+	for idx, iPart := range iSplit {
+		iNum, iLetter := versionLetterSplit(iPart)
+
+		rPart := rSplit[idx]
+		rNum, rLetter := versionLetterSplit(rPart)
+
+		if rNum > iNum {
+			return true
+		}
+
+		if (rNum == iNum) && (rLetter > iLetter) {
+			return true
+		}
+	}
+
+	// New Suffix type
+	var iSuffixPos, rSuffixPos int
+
+	for idx, suffix := range suffixes {
+		if suffix == installed.Version.Suffix {
+			iSuffixPos = idx
+		}
+		if suffix == remote.Version.Suffix {
+			rSuffixPos = idx
+		}
+	}
+
+	if rSuffixPos > iSuffixPos {
+		return true
+	}
+
+	// New version for same Suffix type
+	rSuffixVersion := remote.Version.SuffixVersion
+	iSuffixVersion := installed.Version.SuffixVersion
+	if (rSuffixPos == iSuffixPos) && (rSuffixVersion > iSuffixVersion) {
+		return true
+	}
+
+	// New Revision
+	rRev := remote.Version.Revision
+	iRev := installed.Version.Revision
+	if (rRev > iRev) {
+		return true
+	}
+	
+	// Same or lower version
+	return false
+}
+
+var leadingNumbers = regexp.MustCompile(`\d+`)
+var trailingLetters = regexp.MustCompile(`\w*`)
+
+func versionLetterSplit(version string) (int, string) {
+	numStr := leadingNumbers.FindString(version)
+	letters := trailingLetters.FindString(version)
+
+	num, err := strconv.Atoi(numStr)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to convert version number: %s", err))
+	}
+
+	return num, letters
+}
 
 type PackageVersion struct {
 	String string
