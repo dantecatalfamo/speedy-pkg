@@ -170,12 +170,14 @@ func packageVersion (ver string) *PackageVersion {
 
 	if suffix := packageSuffix.FindStringSubmatch(last); len(suffix) != 0 {
 		pkgVer.Suffix = suffix[1]
-		n, err := strconv.Atoi(suffix[2]);
-		if err != nil {
-			fmt.Println(suffix[0])
-			fmt.Println("Failed to convert package suffix version:", err)
+		if suffix[2] != "" {
+			n, err := strconv.Atoi(suffix[2]);
+			if err != nil {
+				fmt.Println(suffix[0])
+				panic(fmt.Sprintf("Failed to convert package suffix version: %s", err))
+			}
+			pkgVer.SuffixVersion = n
 		}
-		pkgVer.SuffixVersion = n
 		last = packageSuffix.ReplaceAllString(last, "")
 	}
 
