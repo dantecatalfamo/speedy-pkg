@@ -3,18 +3,17 @@ package main
 import (
 	"net/http"
 	//	"io"
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
-	"strings"
 	"regexp"
+	"strings"
 	"unicode"
-	"strconv"
 )
 
 type Package struct {
-	Name string
+	Name    string
 	Version string
 	Flavour string
 }
@@ -24,11 +23,10 @@ func main() {
 	fmt.Println(getMirror())
 	fmt.Println(getRelease())
 	fmt.Println(getArch())
-	fmt.Println(packagIndexUrl())
-	fetchPackageIndex(packagIndexUrl())
+	fmt.Println(packageIndexUrl())
+	fetchPackageIndex(packageIndexUrl())
 	installedPackages()
 }
-
 
 func getMirror() string {
 	url, err := ioutil.ReadFile("/etc/installurl")
@@ -57,7 +55,7 @@ func getArch() string {
 	return strings.TrimSpace(string(arch))
 }
 
-func packagIndexUrl() string {
+func packageIndexUrl() string {
 	mirror := getMirror()
 	release := getRelease()
 	arch := getArch()
@@ -83,7 +81,7 @@ func fetchPackageIndex(url string) []*Package {
 
 	fmt.Println(len(pkgStrs), "packages found")
 	var pkgs []*Package
-	for _, pkgStr := range(pkgStrs) {
+	for _, pkgStr := range pkgStrs {
 		pkg := stringToPackage(pkgStr[1])
 		pkgs = append(pkgs, pkg)
 	}
@@ -93,7 +91,7 @@ func fetchPackageIndex(url string) []*Package {
 func stringToPackage(str string) *Package {
 	fields := strings.Split(str, "-")
 	var verIdx int
-	for idx, field := range(fields) {
+	for idx, field := range fields {
 		if unicode.IsDigit(rune(field[0])) {
 			verIdx = idx
 			break
@@ -106,11 +104,11 @@ func stringToPackage(str string) *Package {
 	if len(fields)-1 > verIdx {
 		flavour = strings.Join(fields[verIdx+1:], "-")
 	}
-	
-	return &Package {
-		Name: name,
+
+	return &Package{
+		Name:    name,
 		Version: version,
-		Flavour: flavour,	
+		Flavour: flavour,
 	}
 }
 
@@ -122,9 +120,11 @@ func installedPackages() []*Package {
 	}
 	pkgLines := strings.Split(string(out), "\n")
 	var pkgs []*Package
-	for _, line := range(pkgLines) {
+	for _, line := range pkgLines {
 		fields := strings.Split(line, " ")
-		if len(fields) == 1 { break }
+		if len(fields) == 1 {
+			break
+		}
 		pkgs = append(pkgs, stringToPackage(fields[0]))
 	}
 	fmt.Println(len(pkgs), "installed packages")
