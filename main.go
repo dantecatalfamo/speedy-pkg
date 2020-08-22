@@ -172,7 +172,7 @@ func packageVersion (ver string) *PackageVersion {
 		pkgVer.Suffix = suffix[1]
 		n, err := strconv.Atoi(suffix[2]);
 		if err != nil {
-			fmt.Println(ver)
+			fmt.Println(suffix[0])
 			fmt.Println("Failed to convert package suffix version:", err)
 		}
 		pkgVer.SuffixVersion = n
@@ -196,6 +196,8 @@ func packageVersion (ver string) *PackageVersion {
 		pkgVer.Scheme = n
 		last = packageScheme.ReplaceAllString(last, "")
 	}
+
+	pkgVer.Version = append(pkgVer.Version, last)
 
 	return pkgVer
 }
