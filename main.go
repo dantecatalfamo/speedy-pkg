@@ -15,7 +15,7 @@ import (
 
 type Package struct {
 	Name    string
-	Version string
+	Version *PackageVersion
 	Flavour string
 }
 
@@ -101,7 +101,7 @@ func stringToPackage(str string) *Package {
 	}
 
 	name := strings.Join(fields[:verIdx], "-")
-	version := fields[verIdx]
+	version := packageVersion(fields[verIdx])
 	flavour := ""
 	if len(fields)-1 > verIdx {
 		flavour = strings.Join(fields[verIdx+1:], "-")
@@ -162,23 +162,40 @@ func packageVersion (ver string) *PackageVersion {
 	lastIdx := len(fields)-1
 	last := fields[lastIdx]
 	pkgVer := &PackageVersion{
+		String: ver,
 		Scheme: -1,
 		Revision: -1,
 	}
 	pkgVer.Version = fields[:lastIdx]
+
 	if suffix := packageSuffix.FindStringSubmatch(last); len(suffix) != 0 {
 		pkgVer.Suffix = suffix[1]
 		n, err := strconv.Atoi(suffix[2]);
 		if err != nil {
-			panic(fmt.Sprintf("Failed to convert package suffix version:", err))
+			fmt.Println(ver)
+			panic(fmt.Sprintf("Failed to convert package suffix version: %s", err))
 		}
 		pkgVer.SuffixVersion = n
+		last = packageSuffix.ReplaceAllString(last, "")
 	}
+
 	if rev := packageRevision.FindStringSubmatch(last); len(rev) != 0 {
 		n, err := strconv.Atoi(rev[1])
 		if err != nil {
 			panic(fmt.Sprintf("Failed to convert package revision: %s", err))
 		}
 		pkgVer.Revision = n
+		last = packageRevision.ReplaceAllString(last, "")
 	}
+
+	if scheme := packageScheme.FindStringSubmatch(last); len(scheme) != 0 {
+		n, err := strconv.Atoi(scheme[1])
+		if err != nil {
+			panic(fmt.Sprintf("Failed to convert package scheme: %s", err))
+		}
+		pkgVer.Scheme = n
+		last = packageScheme.ReplaceAllString(last, "")
+	}
+
+	return pkgVer
 }
