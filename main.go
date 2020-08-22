@@ -269,3 +269,23 @@ func packageVersion (ver string) *PackageVersion {
 
 	return pkgVer
 }
+
+func packageKey(pkg *Package) string {
+	return fmt.Sprintf("%s--%s", pkg.Name, pkg.Flavour)
+}
+
+func upgradablePackages(installed, remote []*Package) []*Package {
+	rMap := make(map[string]*Package)
+	for _, pkg := range remote {
+		rMap[packageKey(pkg)] = pkg
+	}
+
+	var upgradable []*Package
+	for _, iPkg := range installed {
+		rPkg := rMap[packageKey(iPkg)]
+		if newerPackage(iPkg, rPkg) {
+			upgradable = append(upgradable, rPkg)
+		}
+	}
+	return upgradable
+}
