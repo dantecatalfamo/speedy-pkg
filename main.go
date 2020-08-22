@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	// "strconv"
 )
 
 type Package struct {
@@ -24,8 +25,10 @@ func main() {
 	fmt.Println(getRelease())
 	fmt.Println(getArch())
 	fmt.Println(packageIndexUrl())
-	fetchPackageIndex(packageIndexUrl())
-	installedPackages()
+	rpkgs := fetchPackageIndex(packageIndexUrl())
+	fmt.Println(len(rpkgs), "remote packages")
+	ipkgs := installedPackages()
+	fmt.Println(len(ipkgs), "installed packages")
 }
 
 func getMirror() string {
@@ -79,7 +82,6 @@ func fetchPackageIndex(url string) []*Package {
 	regex := regexp.MustCompile(`['"](.*?)\.tgz['"]`)
 	pkgStrs := regex.FindAllStringSubmatch(string(body), -1)
 
-	fmt.Println(len(pkgStrs), "packages found")
 	var pkgs []*Package
 	for _, pkgStr := range pkgStrs {
 		pkg := stringToPackage(pkgStr[1])
@@ -127,17 +129,35 @@ func installedPackages() []*Package {
 		}
 		pkgs = append(pkgs, stringToPackage(fields[0]))
 	}
-	fmt.Println(len(pkgs), "installed packages")
 	return pkgs
 }
 
 // https://man.openbsd.org/man7/packages-specs.7
 
-// func newerPackage(installed, remote *Package) Bool {
-// 	installedVersion := strings.Split(installed.Version, ".")
-// 	remoteVersion := strings.Split(remote.Version, ".")
-// 	for idx := range(installedVersion) {
-// 		rVer := remoteVersion[idx]
-// 		if 
-// 	}
-// }
+func newerPackage(installed, remote *Package) Bool {
+	installedVersion := strings.Split(installed.Version, ".")
+	remoteVersion := strings.Split(remote.Version, ".")
+	iV := installedVersion[len(installedVersion)-1]
+	for idx := range installedVersion {
+		rVer := remoteVersion[idx]
+
+	}
+}
+
+type PackageVersion struct {
+	String string,
+	Version []string,
+	Suffix string,
+	SuffixVersion int,
+	Scheme int,
+}
+
+func packageVersion (ver string) *PackageVersion {
+	fields := strings.Split(ver, ".")
+	lastIdx := len(fields)-1
+	last := fields[lastIdx]
+	pkgVer := &PackageVersion{}
+	for _, num := range fields[:lastIdx] {
+		pkgVer.Version = append(pkgVer.Version, i)
+	}
+}
