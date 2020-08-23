@@ -20,11 +20,12 @@ var concurrent = 5
 var cacheDir = "/tmp/pkg_zone"
 
 type Package struct {
-	Archive string
-	String  string
-	Name    string
-	Version *PackageVersion
-	Flavour string
+	Archive       string
+	String        string
+	Name          string
+	Version       *PackageVersion
+	Flavour       string
+	ForceDownload bool
 }
 
 func main() {
@@ -36,11 +37,11 @@ func main() {
 	fmt.Println(len(ipkgs), "installed packages")
 	upgrd := upgradablePackages(ipkgs, rpkgs)
 	if upgradePrompt(ipkgs, upgrd) {
-		upgrd = append(upgrd, &Package{Archive: "SHA256", String: "Hashes"})
-		upgrd = append(upgrd, &Package{Archive: "SHA256.sig", String: "Signatures"})
+		upgrd = append(upgrd, &Package{Archive: "SHA256", String: "Hashes", ForceDownload: true})
+		upgrd = append(upgrd, &Package{Archive: "SHA256.sig", String: "Signatures", ForceDownload: true})
 		downloadPackages(indx, cacheDir, concurrent, upgrd)
 	}
-	doUpgrade(cacheDir, upgrd)
+	doUpgrade(cacheDir, getMirror(), upgrd)
 }
 
 func getMirror() string {
@@ -351,8 +352,10 @@ func upgradePrompt(installed, upgradable []*Package) bool {
 func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
 	var wg sync.WaitGroup
 
+	fullCache := path.Join(cache, getRelease(), "packages", getArch())
+
 	fmt.Println("Boutta do it")
-	err := os.MkdirAll(cache, 0700)
+	err := os.MkdirAll(fullCache, 0700)
 	if err != nil {
 		fmt.Println("Error making package cache:", err)
 		os.Exit(1)
@@ -362,7 +365,6 @@ func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
 
 	go func() {
 		for _, pkg := range upgrades {
-			fmt.Println("Sending", pkg.Name)
 			in <- pkg
 		}
 		close(in)
@@ -373,12 +375,10 @@ func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
 
 		go func() {
 			defer wg.Done()
-			fmt.Println("Opening worker")
 
 			for pkg := range in {
-				downloadPackage(pkgPath, cache, pkg)
+				downloadPackage(pkgPath, fullCache, pkg)
 			}
-			fmt.Println("Closing worker")
 		}()
 	}
 
@@ -389,7 +389,7 @@ func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
 func downloadPackage(pkgPath, cache string, pkg *Package) {
 	pkgCache := path.Join(cache, pkg.Archive)
 	_, err := os.Stat(pkgCache)
-	if os.IsExist(err) {
+	if !os.IsNotExist(err) && !pkg.ForceDownload {
 		fmt.Println(pkg.String, "Already downloaded, skipping")
 		return
 	}
@@ -419,14 +419,18 @@ func downloadPackage(pkgPath, cache string, pkg *Package) {
 	fmt.Println("Finished downloading", pkg.String)
 }
 
-func doUpgrade(cache string, upgrades []*Package) {
-	var pkgNames []string{"-u"}
+func doUpgrade(cache, installurl string, upgrades []*Package) {
+	fmt.Println("Running install")
+	pkgNames := []string{"-u"}
 	for _, pkg := range upgrades {
 		pkgNames = append(pkgNames, pkg.Name)
 	}
 	cmd := exec.Command("pkg_add", pkgNames...)
 	cmd.Env = os.Environ()
-	pkgPath := fmt.Sprintf("PKG_PATH=%s", cache)
+	pkgPath := fmt.Sprintf("PKG_PATH=%s:%s", cache, installurl)
 	cmd.Env = append(cmd.Env, pkgPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
 	cmd.Run()
 }
