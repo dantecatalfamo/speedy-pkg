@@ -20,6 +20,7 @@ var concurrent = 5
 var cacheDir = "/tmp/pkg_zone"
 
 type Package struct {
+	Archive string
 	String  string
 	Name    string
 	Version *PackageVersion
@@ -35,8 +36,11 @@ func main() {
 	fmt.Println(len(ipkgs), "installed packages")
 	upgrd := upgradablePackages(ipkgs, rpkgs)
 	if upgradePrompt(ipkgs, upgrd) {
+		upgrd = append(upgrd, &Package{Archive: "SHA256", String: "Hashes"})
+		upgrd = append(upgrd, &Package{Archive: "SHA256.sig", String: "Signatures"})
 		downloadPackages(indx, cacheDir, concurrent, upgrd)
 	}
+	doUpgrade(cacheDir, upgrd)
 }
 
 func getMirror() string {
@@ -116,6 +120,7 @@ func stringToPackage(str string) *Package {
 	}
 
 	return &Package{
+		Archive: fmt.Sprintf("%s.tgz", str),
 		String:  str,
 		Name:    name,
 		Version: version,
@@ -382,15 +387,14 @@ func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
 }
 
 func downloadPackage(pkgPath, cache string, pkg *Package) {
-	withExt := fmt.Sprintf("%s.tgz", pkg.String)
-	pkgCache := path.Join(cache, withExt)
+	pkgCache := path.Join(cache, pkg.Archive)
 	_, err := os.Stat(pkgCache)
 	if os.IsExist(err) {
 		fmt.Println(pkg.String, "Already downloaded, skipping")
 		return
 	}
 
-	pkgUrl := fmt.Sprintf("%s/%s", pkgPath, withExt)
+	pkgUrl := fmt.Sprintf("%s/%s", pkgPath, pkg.Archive)
 	resp, err := http.Get(pkgUrl)
 	if err != nil {
 		fmt.Printf("Error downloading %s: %s\n", pkg.String, err)
@@ -409,8 +413,20 @@ func downloadPackage(pkgPath, cache string, pkg *Package) {
 
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
-		fmt.Printf("Error downloading %s: %s\n", withExt, err)
+		fmt.Printf("Error downloading %s: %s\n", pkg.Archive, err)
 		return
 	}
 	fmt.Println("Finished downloading", pkg.String)
+}
+
+func doUpgrade(cache string, upgrades []*Package) {
+	var pkgNames []string{"-u"}
+	for _, pkg := range upgrades {
+		pkgNames = append(pkgNames, pkg.Name)
+	}
+	cmd := exec.Command("pkg_add", pkgNames...)
+	cmd.Env = os.Environ()
+	pkgPath := fmt.Sprintf("PKG_PATH=%s", cache)
+	cmd.Env = append(cmd.Env, pkgPath)
+	cmd.Run()
 }
