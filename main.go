@@ -2,33 +2,40 @@ package main
 
 import (
 	"bufio"
-	"net/http"
-
-	//	"io"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
 )
 
+var concurrent = 5
+var cacheDir = "/tmp/pkg_zone"
+
 type Package struct {
+	String  string
 	Name    string
 	Version *PackageVersion
 	Flavour string
 }
 
 func main() {
-	fmt.Println(packageIndexUrl())
+	indx := packageIndexUrl()
+	fmt.Println(indx)
 	rpkgs := fetchPackageIndex(packageIndexUrl())
 	fmt.Println(len(rpkgs), "remote packages")
 	ipkgs := installedPackages()
 	fmt.Println(len(ipkgs), "installed packages")
 	upgrd := upgradablePackages(ipkgs, rpkgs)
-	upgradePrompt(ipkgs, upgrd)
+	if upgradePrompt(ipkgs, upgrd) {
+		downloadPackages(indx, cacheDir, concurrent, upgrd)
+	}
 }
 
 func getMirror() string {
@@ -108,6 +115,7 @@ func stringToPackage(str string) *Package {
 	}
 
 	return &Package{
+		String:  str,
 		Name:    name,
 		Version: version,
 		Flavour: flavour,
@@ -332,4 +340,73 @@ func upgradePrompt(installed, upgradable []*Package) bool {
 		return false
 	}
 	return true
+}
+
+func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
+	fmt.Println("Boutta do it")
+	err := os.MkdirAll(cache, 0700)
+	if err != nil {
+		fmt.Println("Error making package cache:", err)
+		os.Exit(1)
+	}
+
+	in := make(chan *Package)
+	closed := make(chan bool)
+	go func() {
+		for _, pkg := range upgrades {
+			fmt.Println("Sending", pkg.Name)
+			in <- pkg
+		}
+		close(in)
+	}()
+
+	for i := 0; i < workers; i++ {
+		go func() {
+			fmt.Println("Opening worker")
+			for pkg := range in {
+				downloadPackage(pkgPath, cache, pkg)
+			}
+			fmt.Println("Closing worker")
+			closed <- true
+		}()
+	}
+
+	for i := 0; i < workers; i++ {
+		<-closed
+	}
+	fmt.Println("All closed!")
+}
+
+func downloadPackage(pkgPath, cache string, pkg *Package) {
+	withExt := fmt.Sprintf("%s.tgz", pkg.String)
+	pkgCache := path.Join(cache, withExt)
+	_, err := os.Stat(pkgCache)
+	if os.IsExist(err) {
+		fmt.Println(pkg.String, "Already downloaded, skipping")
+		return
+	}
+
+	pkgUrl := fmt.Sprintf("%s/%s", pkgPath, withExt)
+	resp, err := http.Get(pkgUrl)
+	if err != nil {
+		fmt.Printf("Error downloading %s: %s\n", pkg.String, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	fmt.Println("Downloading", pkg.String)
+
+	out, err := os.Create(pkgCache)
+	if err != nil {
+		fmt.Printf("Error downloading %s: %s\n", pkg.String, err)
+		return
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		fmt.Printf("Error downloading %s: %s\n", withExt, err)
+		return
+	}
+	fmt.Println("Finished downloading", pkg.String)
 }
