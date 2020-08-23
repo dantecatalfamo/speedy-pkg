@@ -22,17 +22,12 @@ type Package struct {
 }
 
 func main() {
-	fmt.Println("OK!")
-	fmt.Println(getMirror())
-	fmt.Println(getRelease())
-	fmt.Println(getArch())
 	fmt.Println(packageIndexUrl())
 	rpkgs := fetchPackageIndex(packageIndexUrl())
 	fmt.Println(len(rpkgs), "remote packages")
 	ipkgs := installedPackages()
 	fmt.Println(len(ipkgs), "installed packages")
 	upgrd := upgradablePackages(ipkgs, rpkgs)
-	fmt.Println(len(upgrd), "upgradable packages")
 	upgradePrompt(ipkgs, upgrd)
 }
 
@@ -299,17 +294,15 @@ var bold = "\u001b[1m"
 var reset = "\u001b[0m"
 
 func upgradePrompt(installed, upgradable []*Package) bool {
-	fmt.Println()
-	pkglen := len(fmt.Sprintf("%d", len(upgradable)))
 	s := ""
 	if len(upgradable) != 1 {
 		s = "s"
-		pkglen++
 	}
-	extraLines := strings.Repeat("=", pkglen)
-
-	fmt.Printf("%d package%s will upgraded, proceed?\n", pkglen, s)
-	fmt.Printf("%s================================\n\n", extraLines)
+	fmt.Println()
+	upgradableMessage := fmt.Sprintf("%d package%s will upgraded, proceed?", len(upgradable), s)
+	fancyLines := strings.Repeat("=", len(upgradableMessage))
+	fmt.Println(upgradableMessage)
+	fmt.Printf("%s\n\n", fancyLines)
 	iMap := make(map[string]*Package)
 	for _, pkg := range installed {
 		iMap[packageMapKey(pkg)] = pkg
