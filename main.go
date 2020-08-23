@@ -272,22 +272,34 @@ func packageVersion (ver string) *PackageVersion {
 	return pkgVer
 }
 
-func packageKey(pkg *Package) string {
+func packageMapKey(pkg *Package) string {
 	return fmt.Sprintf("%s--%s", pkg.Name, pkg.Flavour)
 }
 
 func upgradablePackages(installed, remote []*Package) []*Package {
 	rMap := make(map[string]*Package)
 	for _, pkg := range remote {
-		rMap[packageKey(pkg)] = pkg
+		rMap[packageMapKey(pkg)] = pkg
 	}
 
 	var upgradable []*Package
 	for _, iPkg := range installed {
-		rPkg := rMap[packageKey(iPkg)]
+		rPkg := rMap[packageMapKey(iPkg)]
 		if newerPackage(iPkg, rPkg) {
 			upgradable = append(upgradable, rPkg)
 		}
 	}
 	return upgradable
+}
+
+func upgradePrompt(installed, upgradable []*Package) bool {
+	fmt.Println(len(upgradable), "packages will upgraded, proceed?")
+	iMap := make(map[string]*Package)
+	for _, pkg := range installed {
+		iMap[packageMapKey(pkg)] = pkg
+	}
+
+	for _, uPkg := range upgradable {
+		
+	}
 }
