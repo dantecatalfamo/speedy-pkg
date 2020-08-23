@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 )
 
@@ -343,6 +344,8 @@ func upgradePrompt(installed, upgradable []*Package) bool {
 }
 
 func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
+	var wg sync.WaitGroup
+
 	fmt.Println("Boutta do it")
 	err := os.MkdirAll(cache, 0700)
 	if err != nil {
@@ -351,7 +354,7 @@ func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
 	}
 
 	in := make(chan *Package)
-	closed := make(chan bool)
+
 	go func() {
 		for _, pkg := range upgrades {
 			fmt.Println("Sending", pkg.Name)
@@ -361,19 +364,20 @@ func downloadPackages(pkgPath, cache string, workers int, upgrades []*Package) {
 	}()
 
 	for i := 0; i < workers; i++ {
+		wg.Add(1)
+
 		go func() {
+			defer wg.Done()
 			fmt.Println("Opening worker")
+
 			for pkg := range in {
 				downloadPackage(pkgPath, cache, pkg)
 			}
 			fmt.Println("Closing worker")
-			closed <- true
 		}()
 	}
 
-	for i := 0; i < workers; i++ {
-		<-closed
-	}
+	wg.Wait()
 	fmt.Println("All closed!")
 }
 
