@@ -1,16 +1,18 @@
 package main
 
 import (
+	"bufio"
 	"net/http"
+
 	//	"io"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
-	"strconv"
 )
 
 type Package struct {
@@ -31,6 +33,7 @@ func main() {
 	fmt.Println(len(ipkgs), "installed packages")
 	upgrd := upgradablePackages(ipkgs, rpkgs)
 	fmt.Println(len(upgrd), "upgradable packages")
+	upgradePrompt(ipkgs, upgrd)
 }
 
 func getMirror() string {
@@ -134,7 +137,7 @@ func installedPackages() []*Package {
 	return pkgs
 }
 
-var suffixes = []string{ "alpha", "beta", "rc", "pre", "", "pl" }
+var suffixes = []string{"alpha", "beta", "rc", "pre", "", "pl"}
 
 func newerPackage(installed, remote *Package) bool {
 	// https://man.openbsd.org/man7/packages-specs.7
@@ -189,10 +192,10 @@ func newerPackage(installed, remote *Package) bool {
 	// New Revision
 	rRev := remote.Version.Revision
 	iRev := installed.Version.Revision
-	if (rRev > iRev) {
+	if rRev > iRev {
 		return true
 	}
-	
+
 	// Same or lower version
 	return false
 }
@@ -213,25 +216,25 @@ func versionLetterSplit(version string) (int, string) {
 }
 
 type PackageVersion struct {
-	String string
-	Version []string
-	Revision int
-	Suffix string
+	String        string
+	Version       []string
+	Revision      int
+	Suffix        string
 	SuffixVersion int
-	Scheme int
+	Scheme        int
 }
 
 var packageSuffix = regexp.MustCompile(`(rc|alpha|beta|pre|pl)(\d*)`)
 var packageRevision = regexp.MustCompile(`p(\d+)`)
 var packageScheme = regexp.MustCompile(`[vV](\d+)`)
 
-func packageVersion (ver string) *PackageVersion {
+func packageVersion(ver string) *PackageVersion {
 	fields := strings.Split(ver, ".")
-	lastIdx := len(fields)-1
+	lastIdx := len(fields) - 1
 	last := fields[lastIdx]
 	pkgVer := &PackageVersion{
-		String: ver,
-		Scheme: -1,
+		String:   ver,
+		Scheme:   -1,
 		Revision: -1,
 	}
 	pkgVer.Version = fields[:lastIdx]
@@ -239,7 +242,7 @@ func packageVersion (ver string) *PackageVersion {
 	if suffix := packageSuffix.FindStringSubmatch(last); len(suffix) != 0 {
 		pkgVer.Suffix = suffix[1]
 		if suffix[2] != "" {
-			n, err := strconv.Atoi(suffix[2]);
+			n, err := strconv.Atoi(suffix[2])
 			if err != nil {
 				fmt.Println(suffix[0])
 				panic(fmt.Sprintf("Failed to convert package suffix version: %s", err))
@@ -292,14 +295,48 @@ func upgradablePackages(installed, remote []*Package) []*Package {
 	return upgradable
 }
 
+var bold = "\u001b[1m"
+var reset = "\u001b[0m"
+
 func upgradePrompt(installed, upgradable []*Package) bool {
-	fmt.Println(len(upgradable), "packages will upgraded, proceed?")
+	fmt.Println()
+	pkglen := len(fmt.Sprintf("%d", len(upgradable)))
+	s := ""
+	if len(upgradable) != 1 {
+		s = "s"
+		pkglen++
+	}
+	extraLines := strings.Repeat("=", pkglen)
+
+	fmt.Printf("%d package%s will upgraded, proceed?\n", pkglen, s)
+	fmt.Printf("%s================================\n\n", extraLines)
 	iMap := make(map[string]*Package)
 	for _, pkg := range installed {
 		iMap[packageMapKey(pkg)] = pkg
 	}
 
-	for _, uPkg := range upgradable {
-		
+	longestName := 0
+	for _, pkg := range upgradable {
+		if len(pkg.Name) > longestName {
+			longestName = len(pkg.Name)
+		}
 	}
+
+	for _, uPkg := range upgradable {
+		iPkg := iMap[packageMapKey(uPkg)]
+		name := iPkg.Name
+		space := longestName - len(iPkg.Name) + 2
+		spaces := strings.Repeat(" ", space)
+		iVer := iPkg.Version.String
+		uVer := uPkg.Version.String
+		fmt.Printf("%s%s%s%s%s -> %s\n", bold, name, reset, spaces, iVer, uVer)
+	}
+
+	fmt.Print("\nContinue? [Y/n]: ")
+	reader := bufio.NewReader(os.Stdin)
+	resp, _ := reader.ReadString('\n')
+	if resp[0] == 'n' || resp[0] == 'N' {
+		return false
+	}
+	return true
 }
